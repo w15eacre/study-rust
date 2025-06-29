@@ -1,0 +1,2 @@
+# study-rust
+Rust education
