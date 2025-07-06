@@ -117,3 +117,83 @@ impl MathExpressionTokenizer {
         self.expr.as_bytes().len()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+
+    #[test]
+    fn test_empty_string_tokens() {
+        assert!(MathExpressionTokenizer::new("".to_string()).is_err());
+    }
+
+    #[test]
+    fn test_zero_number_tokens() {
+        let mut tokenizer = MathExpressionTokenizer::new("0".to_string()).unwrap();
+        assert!(tokenizer.has_token());
+        let (token, idx) = tokenizer.next_token().unwrap();
+        assert_eq!(idx, 0);
+
+        if let Token::Digit(number) = token {
+            assert!((number - 0.0).abs() < f64::EPSILON);
+        } else {
+            panic!("Expected Token::Digit, got {:?}", token);
+        }
+
+        let mut tokenizer = MathExpressionTokenizer::new("-0".to_string()).unwrap();
+        assert!(tokenizer.has_token());
+        let (token, idx) = tokenizer.next_token().unwrap();
+        assert_eq!(idx, 0);
+        assert!(matches!(token, Token::Operator('-')));
+
+        assert!(tokenizer.has_token());
+        let (token, idx) = tokenizer.next_token().unwrap();
+        assert_eq!(idx, 1);
+
+        if let Token::Digit(number) = token {
+            assert!((number - 0.0).abs() < f64::EPSILON);
+        } else {
+            panic!("Expected Token::Digit, got {:?}", token);
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn test_valid_positive_number_tokens(n in any::<f64>().prop_filter("Positive numbers", |&x| x > 0.0)) {
+            let mut tokenizer = MathExpressionTokenizer::new(format!("{}", n)).unwrap();
+            assert!(tokenizer.has_token());
+            let (token, idx) = tokenizer.next_token().unwrap();
+            assert_eq!(idx, 0);
+
+            if let Token::Digit(number) = token
+            {
+                assert_eq!(number, n);
+            }
+            else {
+                panic!("Expected Token::Digit, got {:?}", token);
+            }
+        }
+
+        #[test]
+        fn test_valid_negative_number_tokens(n in any::<f64>().prop_filter("Positive numbers", |&x| x < 0.0)) {
+            let mut tokenizer = MathExpressionTokenizer::new(format!("{}", n)).unwrap();
+            assert!(tokenizer.has_token());
+            let (token, idx) = tokenizer.next_token().unwrap();
+            assert_eq!(idx, 0);
+            assert!(matches!(token, Token::Operator('-')));
+
+            assert!(tokenizer.has_token());
+            let (token, idx) = tokenizer.next_token().unwrap();
+            assert_eq!(idx, 1);
+
+            if let Token::Digit(number) = token
+            {
+                assert_eq!(number, n.abs());
+            }
+            else {
+                panic!("Expected Token::Digit, got {:?}", token);
+            }
+        }
+    }
+}
