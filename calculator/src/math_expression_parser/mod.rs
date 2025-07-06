@@ -30,7 +30,7 @@ impl MathExpressionParser {
         let mut parsed_expression = MathExpression { expression: vec![] };
         let mut braces = vec![];
 
-        while let Ok((token, idx)) = tokenizer.next_token() {
+        while let Ok((idx, token)) = tokenizer.next_token() {
             match token {
                 Token::OpenBrace => {
                     braces.push(idx);
