@@ -1,31 +1,15 @@
-use crate::math_expression_tokenizer::{
-    MathExpressionTokenizer, MathExpressionTokenizerError, Token,
-};
+use crate::math_expression_tokenizer::{MathExpressionTokenizerError, Token, TokenizerTraits};
 
 use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum MathExpressionParserError {
-    #[error("Invalid argument")]
-    InvalidArgument,
-    #[error("Found invalid token '{ch}' at position {idx}")]
-    InvalidToken { idx: usize, ch: char },
-    #[error("Invalid Expression by index '{idx}'")]
+    #[error("Tokenizer error: {0}")]
+    Tokenizer(#[from] MathExpressionTokenizerError),
+    #[error("Invalid expression by index '{idx}'")]
     InvalidExpression { idx: usize },
-}
-
-impl From<MathExpressionTokenizerError> for MathExpressionParserError {
-    fn from(err: MathExpressionTokenizerError) -> Self {
-        match err {
-            MathExpressionTokenizerError::InvalidArgument => {
-                MathExpressionParserError::InvalidArgument
-            }
-            MathExpressionTokenizerError::InvalidToken { idx, ch } => {
-                MathExpressionParserError::InvalidToken { idx, ch }
-            }
-            _ => unreachable!("Unexpected tokenizer error"),
-        }
-    }
+    #[error("Invalid braces consequence '{idx}'")]
+    InvalidBraceConsequence { idx: usize },
 }
 
 pub struct MathExpression {
@@ -39,9 +23,10 @@ impl MathExpressionParser {
         Self {}
     }
 
-    pub fn parse(&self, expr: String) -> Result<MathExpression, MathExpressionParserError> {
-        let expr_len = expr.as_bytes().len();
-        let mut tokenizer = MathExpressionTokenizer::new(expr)?;
+    pub fn parse<Tokenizer: TokenizerTraits>(
+        &self,
+        mut tokenizer: Tokenizer,
+    ) -> Result<MathExpression, MathExpressionParserError> {
         let mut parsed_expression = MathExpression { expression: vec![] };
         let mut braces = vec![];
 
@@ -75,7 +60,7 @@ impl MathExpressionParser {
                         };
                     }
                 }
-                Token::Operator(op) => {
+                Token::Operator(_) => {
                     let Some(last_token) = parsed_expression.expression.last() else {
                         return Err(MathExpressionParserError::InvalidExpression { idx });
                     };
@@ -92,7 +77,7 @@ impl MathExpressionParser {
         if let Some(last_token) = parsed_expression.expression.last() {
             if matches!(last_token, Token::Operator(_) | Token::OpenBrace) {
                 return Err(MathExpressionParserError::InvalidExpression {
-                    idx: expr_len - 1,
+                    idx: tokenizer.curr_index(),
                 });
             }
         }
@@ -100,7 +85,7 @@ impl MathExpressionParser {
         if braces.is_empty() {
             Ok(parsed_expression)
         } else {
-            Err(MathExpressionParserError::InvalidExpression {
+            Err(MathExpressionParserError::InvalidBraceConsequence {
                 idx: *braces.last().unwrap(),
             })
         }

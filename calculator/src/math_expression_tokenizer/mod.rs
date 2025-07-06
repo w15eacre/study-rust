@@ -19,35 +19,34 @@ pub enum MathExpressionTokenizerError {
 }
 
 pub struct MathExpressionTokenizer {
-    m_math_expr: String,
+    expr: String,
     curr_idx: usize,
 }
 
-impl MathExpressionTokenizer {
-    pub fn new(math_expr: String) -> Result<Self, MathExpressionTokenizerError> {
-        if math_expr.is_empty() {
-            return Err(MathExpressionTokenizerError::InvalidArgument);
-        }
+pub trait TokenizerTraits {
+    fn has_token(&self) -> bool;
+    fn next_token(&mut self) -> Result<(Token, usize), MathExpressionTokenizerError>;
+    fn curr_index(&self) -> usize;
+}
 
-        Ok(Self {
-            m_math_expr: math_expr,
-            curr_idx: 0,
-        })
-    }
-
-    pub fn has_token(&self) -> bool {
+impl TokenizerTraits for MathExpressionTokenizer {
+    fn has_token(&self) -> bool {
         let idx = self.skip_spaces();
-        return idx < self.m_math_expr.as_bytes().len();
+        return idx < self.expr.as_bytes().len();
     }
 
-    pub fn next_token(&mut self) -> Result<(Token, usize), MathExpressionTokenizerError> {
+    fn curr_index(&self) -> usize {
+        self.curr_idx
+    }
+
+    fn next_token(&mut self) -> Result<(Token, usize), MathExpressionTokenizerError> {
         if !self.has_token() {
             return Err(MathExpressionTokenizerError::NoToken);
         }
 
         self.curr_idx = self.skip_spaces();
 
-        match self.m_math_expr.as_bytes()[self.curr_idx] {
+        match self.expr.as_bytes()[self.curr_idx] {
             b'(' => {
                 self.curr_idx += 1;
                 Ok((Token::OpenBrace, self.curr_idx - 1))
@@ -66,10 +65,23 @@ impl MathExpressionTokenizer {
             }
         }
     }
+}
+
+impl MathExpressionTokenizer {
+    pub fn new(math_expr: String) -> Result<Self, MathExpressionTokenizerError> {
+        if math_expr.is_empty() {
+            return Err(MathExpressionTokenizerError::InvalidArgument);
+        }
+
+        Ok(Self {
+            expr: math_expr,
+            curr_idx: 0,
+        })
+    }
 
     fn parse_digits(&mut self) -> Result<(f64, usize), MathExpressionTokenizerError> {
         let mut tmp = String::new();
-        let bytes = self.m_math_expr.as_bytes();
+        let bytes = self.expr.as_bytes();
 
         let begin = self.curr_idx;
 
@@ -91,17 +103,17 @@ impl MathExpressionTokenizer {
     }
 
     fn skip_spaces(&self) -> usize {
-        if let Some(idx) = self.m_math_expr.as_bytes()[self.curr_idx..]
+        if let Some(idx) = self.expr.as_bytes()[self.curr_idx..]
             .iter()
             .position(|x| !x.is_ascii_whitespace())
         {
-            return if self.curr_idx + idx < self.m_math_expr.bytes().len() {
+            return if self.curr_idx + idx < self.expr.bytes().len() {
                 self.curr_idx + idx
             } else {
-                self.m_math_expr.as_bytes().len()
+                self.expr.as_bytes().len()
             };
         };
 
-        self.m_math_expr.as_bytes().len()
+        self.expr.as_bytes().len()
     }
 }
