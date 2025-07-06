@@ -10,8 +10,9 @@ The first project is a simple calculator.
 It consists of three main stages:
 
 1. **Tokenization** — the calculator parses a math expression into tokens (numbers, operators, brackets, etc.).
-2. **Conversion to Reverse Polish Notation (RPN)** — using the Shunting Yard algorithm.
-3. **Evaluation** — the calculator evaluates the expression in RPN form.
+2. **Math expession parse** - Analyzes and transform a sequence of tokens.
+3. **Conversion to Reverse Polish Notation (RPN)** — using the Shunting Yard algorithm.
+4. **Evaluation** — the calculator evaluates the expression in RPN form.
 
 ---
 
