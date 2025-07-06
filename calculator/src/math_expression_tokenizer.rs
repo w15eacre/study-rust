@@ -40,7 +40,7 @@ impl MathExpressionTokenizer {
         return idx < self.m_math_expr.as_bytes().len();
     }
 
-    pub fn next_token(&mut self) -> Result<Token, MathExpressionTokenizerErrors> {
+    pub fn next_token(&mut self) -> Result<(Token, usize), MathExpressionTokenizerErrors> {
         if !self.has_token() {
             return Err(MathExpressionTokenizerErrors::NoToken);
         }
@@ -50,26 +50,28 @@ impl MathExpressionTokenizer {
         match self.m_math_expr.as_bytes()[self.curr_idx] {
             b'(' => {
                 self.curr_idx += 1;
-                Ok(Token::OpenBrace)
+                Ok((Token::OpenBrace, self.curr_idx - 1))
             }
             b')' => {
                 self.curr_idx += 1;
-                Ok(Token::CloseBrace)
+                Ok((Token::CloseBrace, self.curr_idx - 1))
             }
             op @ (b'+' | b'-' | b'*' | b'/') => {
                 self.curr_idx += 1;
-                Ok(Token::Operator(op as char))
+                Ok((Token::Operator(op as char), self.curr_idx - 1))
             }
             _ => {
-                let digit = self.parse_digits()?;
-                Ok(Token::Digit(digit))
+                let (digit, idx) = self.parse_digits()?;
+                Ok((Token::Digit(digit), idx))
             }
         }
     }
 
-    fn parse_digits(&mut self) -> Result<f64, MathExpressionTokenizerErrors> {
+    fn parse_digits(&mut self) -> Result<(f64, usize), MathExpressionTokenizerErrors> {
         let mut tmp = String::new();
         let bytes = self.m_math_expr.as_bytes();
+
+        let begin = self.curr_idx;
 
         while self.curr_idx < bytes.len()
             && (bytes[self.curr_idx].is_ascii_digit() || bytes[self.curr_idx] == b'.')
@@ -80,10 +82,10 @@ impl MathExpressionTokenizer {
         }
 
         match tmp.parse::<f64>() {
-            Ok(number) => Ok(number),
+            Ok(number) => Ok((number, begin)),
             Err(_) => Err(MathExpressionTokenizerErrors::InvalidToken {
-                idx: self.curr_idx - tmp.len(),
-                ch: bytes[self.curr_idx - tmp.len()] as char,
+                idx: begin,
+                ch: bytes[begin] as char,
             }),
         }
     }
