@@ -1,11 +1,11 @@
 use crate::math_expression_tokenizer::{
-    MathExpressionTokenizer, MathExpressionTokenizerErrors, Token,
+    MathExpressionTokenizer, MathExpressionTokenizerError, Token,
 };
 
 use thiserror::Error;
 
 #[derive(Debug, Error)]
-pub enum MathExpressionParserErrors {
+pub enum MathExpressionParserError {
     #[error("Invalid argument")]
     InvalidArgument,
     #[error("Found invalid token '{ch}' at position {idx}")]
@@ -14,14 +14,14 @@ pub enum MathExpressionParserErrors {
     InvalidExpression { idx: usize },
 }
 
-impl From<MathExpressionTokenizerErrors> for MathExpressionParserErrors {
-    fn from(err: MathExpressionTokenizerErrors) -> Self {
+impl From<MathExpressionTokenizerError> for MathExpressionParserError {
+    fn from(err: MathExpressionTokenizerError) -> Self {
         match err {
-            MathExpressionTokenizerErrors::InvalidArgument => {
-                MathExpressionParserErrors::InvalidArgument
+            MathExpressionTokenizerError::InvalidArgument => {
+                MathExpressionParserError::InvalidArgument
             }
-            MathExpressionTokenizerErrors::InvalidToken { idx, ch } => {
-                MathExpressionParserErrors::InvalidToken { idx, ch }
+            MathExpressionTokenizerError::InvalidToken { idx, ch } => {
+                MathExpressionParserError::InvalidToken { idx, ch }
             }
             _ => unreachable!("Unexpected tokenizer error"),
         }
@@ -39,7 +39,7 @@ impl MathExpressionParser {
         Self {}
     }
 
-    pub fn parse(&self, expr: String) -> Result<MathExpression, MathExpressionParserErrors> {
+    pub fn parse(&self, expr: String) -> Result<MathExpression, MathExpressionParserError> {
         let expr_len = expr.as_bytes().len();
         let mut tokenizer = MathExpressionTokenizer::new(expr)?;
         let mut parsed_expression = MathExpression { expression: vec![] };
@@ -51,37 +51,37 @@ impl MathExpressionParser {
                     braces.push(idx);
                     if let Some(last_token) = parsed_expression.expression.last() {
                         if !matches!(last_token, Token::Operator(_) | Token::OpenBrace) {
-                            return Err(MathExpressionParserErrors::InvalidExpression { idx });
+                            return Err(MathExpressionParserError::InvalidExpression { idx });
                         };
                     }
                 }
                 Token::CloseBrace => {
                     if braces.pop().is_none() {
-                        return Err(MathExpressionParserErrors::InvalidExpression { idx });
+                        return Err(MathExpressionParserError::InvalidExpression { idx });
                     }
 
                     let Some(last_token) = parsed_expression.expression.last() else {
-                        return Err(MathExpressionParserErrors::InvalidExpression { idx });
+                        return Err(MathExpressionParserError::InvalidExpression { idx });
                     };
 
                     if !matches!(last_token, Token::Digit(_) | Token::CloseBrace) {
-                        return Err(MathExpressionParserErrors::InvalidExpression { idx });
+                        return Err(MathExpressionParserError::InvalidExpression { idx });
                     }
                 }
                 Token::Digit(_) => {
                     if let Some(last_token) = parsed_expression.expression.last() {
                         if !matches!(last_token, Token::Operator(_) | Token::OpenBrace) {
-                            return Err(MathExpressionParserErrors::InvalidExpression { idx });
+                            return Err(MathExpressionParserError::InvalidExpression { idx });
                         };
                     }
                 }
                 Token::Operator(op) => {
                     let Some(last_token) = parsed_expression.expression.last() else {
-                        return Err(MathExpressionParserErrors::InvalidExpression { idx });
+                        return Err(MathExpressionParserError::InvalidExpression { idx });
                     };
 
                     if !matches!(last_token, Token::Digit(_) | Token::CloseBrace) {
-                        return Err(MathExpressionParserErrors::InvalidExpression { idx });
+                        return Err(MathExpressionParserError::InvalidExpression { idx });
                     }
                 }
             }
@@ -91,7 +91,7 @@ impl MathExpressionParser {
 
         if let Some(last_token) = parsed_expression.expression.last() {
             if matches!(last_token, Token::Operator(_) | Token::OpenBrace) {
-                return Err(MathExpressionParserErrors::InvalidExpression {
+                return Err(MathExpressionParserError::InvalidExpression {
                     idx: expr_len - 1,
                 });
             }
@@ -100,7 +100,7 @@ impl MathExpressionParser {
         if braces.is_empty() {
             Ok(parsed_expression)
         } else {
-            Err(MathExpressionParserErrors::InvalidExpression {
+            Err(MathExpressionParserError::InvalidExpression {
                 idx: *braces.last().unwrap(),
             })
         }

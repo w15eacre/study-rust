@@ -9,7 +9,7 @@ pub enum Token {
 }
 
 #[derive(Debug, Error)]
-pub enum MathExpressionTokenizerErrors {
+pub enum MathExpressionTokenizerError {
     #[error("Invalid argument")]
     InvalidArgument,
     #[error("Found invalid token '{ch}' at position {idx}")]
@@ -24,9 +24,9 @@ pub struct MathExpressionTokenizer {
 }
 
 impl MathExpressionTokenizer {
-    pub fn new(math_expr: String) -> Result<Self, MathExpressionTokenizerErrors> {
+    pub fn new(math_expr: String) -> Result<Self, MathExpressionTokenizerError> {
         if math_expr.is_empty() {
-            return Err(MathExpressionTokenizerErrors::InvalidArgument);
+            return Err(MathExpressionTokenizerError::InvalidArgument);
         }
 
         Ok(Self {
@@ -40,9 +40,9 @@ impl MathExpressionTokenizer {
         return idx < self.m_math_expr.as_bytes().len();
     }
 
-    pub fn next_token(&mut self) -> Result<(Token, usize), MathExpressionTokenizerErrors> {
+    pub fn next_token(&mut self) -> Result<(Token, usize), MathExpressionTokenizerError> {
         if !self.has_token() {
-            return Err(MathExpressionTokenizerErrors::NoToken);
+            return Err(MathExpressionTokenizerError::NoToken);
         }
 
         self.curr_idx = self.skip_spaces();
@@ -67,7 +67,7 @@ impl MathExpressionTokenizer {
         }
     }
 
-    fn parse_digits(&mut self) -> Result<(f64, usize), MathExpressionTokenizerErrors> {
+    fn parse_digits(&mut self) -> Result<(f64, usize), MathExpressionTokenizerError> {
         let mut tmp = String::new();
         let bytes = self.m_math_expr.as_bytes();
 
@@ -83,7 +83,7 @@ impl MathExpressionTokenizer {
 
         match tmp.parse::<f64>() {
             Ok(number) => Ok((number, begin)),
-            Err(_) => Err(MathExpressionTokenizerErrors::InvalidToken {
+            Err(_) => Err(MathExpressionTokenizerError::InvalidToken {
                 idx: begin,
                 ch: bytes[begin] as char,
             }),
