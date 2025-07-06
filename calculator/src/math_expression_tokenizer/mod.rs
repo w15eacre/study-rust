@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Token {
     Digit(f64),
     Operator(char),
@@ -32,7 +32,7 @@ pub trait TokenizerTraits {
 impl TokenizerTraits for MathExpressionTokenizer {
     fn has_token(&self) -> bool {
         let idx = self.skip_spaces();
-        return idx < self.expr.as_bytes().len();
+        return idx < self.expr.len();
     }
 
     fn curr_index(&self) -> usize {
@@ -46,21 +46,22 @@ impl TokenizerTraits for MathExpressionTokenizer {
 
         self.curr_idx = self.skip_spaces();
 
-        match self.expr.as_bytes()[self.curr_idx] {
-            b'(' => {
+        match self.expr.chars().nth(self.curr_idx).unwrap() {
+            '(' => {
                 self.curr_idx += 1;
                 Ok((Token::OpenBrace, self.curr_idx - 1))
             }
-            b')' => {
+            ')' => {
                 self.curr_idx += 1;
                 Ok((Token::CloseBrace, self.curr_idx - 1))
             }
-            op @ (b'+' | b'-' | b'*' | b'/') => {
+            op @ ('+' | '-' | '*' | '/') => {
                 self.curr_idx += 1;
-                Ok((Token::Operator(op as char), self.curr_idx - 1))
+                Ok((Token::Operator(op), self.curr_idx - 1))
             }
             _ => {
-                let (digit, idx) = self.parse_digits()?;
+                let (digit, mut idx) = self.parse_digits()?;
+                std::mem::swap(&mut self.curr_idx, &mut idx);
                 Ok((Token::Digit(digit), idx))
             }
         }
@@ -79,42 +80,30 @@ impl MathExpressionTokenizer {
         })
     }
 
-    fn parse_digits(&mut self) -> Result<(f64, usize), MathExpressionTokenizerError> {
-        let mut tmp = String::new();
-        let bytes = self.expr.as_bytes();
+    fn parse_digits(&self) -> Result<(f64, usize), MathExpressionTokenizerError> {
+        let s = &self.expr[self.curr_idx..];
 
-        let begin = self.curr_idx;
+        let offset = s
+            .char_indices()
+            .find(|&(_, ch)| !ch.is_digit(10) && ch != '.')
+            .map(|(i, _)| i)
+            .unwrap_or(s.len());
 
-        while self.curr_idx < bytes.len()
-            && (bytes[self.curr_idx].is_ascii_digit() || bytes[self.curr_idx] == b'.')
-        {
-            tmp.push(bytes[self.curr_idx] as char);
-
-            self.curr_idx += 1;
-        }
-
-        match tmp.parse::<f64>() {
-            Ok(number) => Ok((number, begin)),
+        match s[..offset].parse::<f64>() {
+            Ok(number) => Ok((number, self.curr_idx + offset)),
             Err(_) => Err(MathExpressionTokenizerError::InvalidToken {
-                idx: begin,
-                ch: bytes[begin] as char,
+                idx: self.curr_idx,
+                ch: s.chars().nth(0).unwrap(),
             }),
         }
     }
 
     fn skip_spaces(&self) -> usize {
-        if let Some(idx) = self.expr.as_bytes()[self.curr_idx..]
-            .iter()
-            .position(|x| !x.is_ascii_whitespace())
-        {
-            return if self.curr_idx + idx < self.expr.bytes().len() {
-                self.curr_idx + idx
-            } else {
-                self.expr.as_bytes().len()
-            };
-        };
-
-        self.expr.as_bytes().len()
+        self.expr[self.curr_idx..]
+            .char_indices()
+            .position(|(_, char)| !char.is_whitespace())
+            .map(|idx| self.curr_idx + idx)
+            .unwrap_or(self.expr.len())
     }
 }
 
@@ -194,6 +183,68 @@ mod tests {
             else {
                 panic!("Expected Token::Digit, got {:?}", token);
             }
+        }
+
+        #[test]
+        fn test_valid_operator_tokens(s in r"[+\-*/ ]{1,50}".prop_filter("no leading space", |s| !s.starts_with(char::is_whitespace))) {
+            let mut tokenizer = MathExpressionTokenizer::new(s.clone()).unwrap();
+            assert!(tokenizer.has_token());
+
+            while let Ok((token, idx)) = tokenizer.next_token() {
+                let op = s.chars().nth(idx).unwrap();
+                assert_eq!(token, Token::Operator(op));
+            }
+
+            assert!(!tokenizer.has_token());
+        }
+
+        #[test]
+        fn test_braces_tokens(s in r"[() ]{1,50}".prop_filter("no leading space", |s| !s.starts_with(char::is_whitespace))) {
+            let mut tokenizer = MathExpressionTokenizer::new(s.clone()).unwrap();
+            assert!(tokenizer.has_token());
+
+            while let Ok((token, idx)) = tokenizer.next_token() {
+                let op = s.chars().nth(idx).unwrap();
+                if op == '('
+                {
+                    assert_eq!(token, Token::OpenBrace);
+                }
+                else if op == ')'
+                {
+                    assert_eq!(token, Token::CloseBrace);
+                }
+            }
+
+            assert!(!tokenizer.has_token());
+        }
+
+        #[test]
+        fn test_valid_sequence_tokens(s in r"[0-9+\-*/() ]{1,10}".prop_filter("no leading space", |s| !s.starts_with(char::is_whitespace))) {
+            let mut tokenizer = MathExpressionTokenizer::new(s.clone()).unwrap();
+            assert!(tokenizer.has_token());
+
+             println!("Ch:{}",s);
+
+            while let Ok((token, idx)) = tokenizer.next_token() {
+                    let ch = s.chars().nth(idx).unwrap();
+                    println!("Ch: {} - {}", ch, s);
+                    match token {
+                        Token::OpenBrace => {
+                            assert_eq!(ch, '(');
+                        },
+                        Token::CloseBrace => {
+                            assert_eq!(ch, ')');
+                        },
+                        Token::Operator(op) => {
+                            assert_eq!(ch, op);
+                        },
+                        Token::Digit(_) => {
+                            assert!(ch.is_digit(10));
+                        },
+                    }
+                }
+
+            assert!(!tokenizer.has_token());
         }
     }
 }
